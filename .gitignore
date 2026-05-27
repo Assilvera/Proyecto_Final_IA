@@ -1,0 +1,21 @@
+# Entorno virtual
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Modelos
+*.pkl
+
+# Datos pesados
+*.csv
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+
+# Variables entorno
+.env
