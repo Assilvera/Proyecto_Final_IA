@@ -135,6 +135,22 @@ def canal(contactos):
         return "SMS"
 
 # ==========================================
+
+def generar_respuesta_ia(probabilidad, cliente, riesgo, prioridad_ia, canal_ia, estrategia_ia):
+
+    prob_pct = round(float(probabilidad) * 100, 2)
+
+    return f"""Cliente analizado exitosamente.
+
+• Probabilidad de recuperación: {prob_pct}%
+• Nivel de riesgo: {riesgo}
+• Prioridad: {prioridad_ia}
+• Canal recomendado: {canal_ia}
+• Estrategia sugerida: {estrategia_ia}
+
+La estrategia fue calculada con base en las variables históricas del cliente y el modelo predictivo entrenado."""
+
+# ==========================================
 # ENDPOINT
 # ==========================================
 
@@ -273,6 +289,16 @@ def analizar():
             "estrategia":
             estrategia_ia,
 
+            "respuesta_ia":
+            generar_respuesta_ia(
+                probabilidad,
+                cliente,
+                riesgo,
+                prioridad_ia,
+                canal_ia,
+                estrategia_ia
+            ),
+
             "mora":
             int(cliente["MORA"]),
 
@@ -354,44 +380,47 @@ def consultar():
             nuevo_cliente
         )[0][1]
 
+        riesgo = calcular_riesgo(
+            probabilidad,
+            cliente["MORA"],
+            cliente["SCORE_EXTERNO"]
+        )
+
+        prioridad_ia = prioridad(
+            probabilidad,
+            cliente["SALDO"]
+        )
+
+        canal_ia = canal(cliente["CONTACTOS"])
+
+        estrategia_ia = estrategia(
+            probabilidad,
+            cliente["MORA"]
+        )
+
         resultado = {
 
-    "cedula": str(cliente["CEDULA"]),
+            "cedula": str(cliente["CEDULA"]),
 
-    "probabilidad": f"{round(float(probabilidad)*100,2)}%",
+            "probabilidad": f"{round(float(probabilidad)*100,2)}%",
 
-    "nivel_riesgo": calcular_riesgo(
-        probabilidad,
-        cliente["MORA"],
-        cliente["SCORE_EXTERNO"]
-    ),
+            "nivel_riesgo": riesgo,
 
-    "prioridad": prioridad(
-        probabilidad,
-        cliente["SALDO"]
-    ),
+            "prioridad": prioridad_ia,
 
-    "canal_recomendado": canal(
-        cliente["CONTACTOS"]
-    ),
+            "canal_recomendado": canal_ia,
 
-    "estrategia": estrategia(
-        probabilidad,
-        cliente["MORA"]
-    ),
+            "estrategia": estrategia_ia,
 
-    "respuesta_ia": f"""
-Cliente analizado exitosamente.
-
-• Probabilidad de recuperación: {round(float(probabilidad)*100,2)}%
-• Nivel de riesgo: {calcular_riesgo(probabilidad, cliente["MORA"], cliente["SCORE_EXTERNO"])}
-• Prioridad: {prioridad(probabilidad, cliente["SALDO"])}
-• Canal recomendado: {canal(cliente["CONTACTOS"])}
-• Estrategia sugerida: {estrategia(probabilidad, cliente["MORA"])}
-
-La estrategia fue calculada con base en las variables históricas del cliente y el modelo predictivo entrenado.
-"""
-}
+            "respuesta_ia": generar_respuesta_ia(
+                probabilidad,
+                cliente,
+                riesgo,
+                prioridad_ia,
+                canal_ia,
+                estrategia_ia
+            )
+        }
 
         return render_template(
             "index.html",
