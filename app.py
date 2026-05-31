@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template  
 import pandas as pd
 import joblib
 from sklearn.preprocessing import LabelEncoder
@@ -8,6 +8,10 @@ from sklearn.preprocessing import LabelEncoder
 # ==========================================
 
 app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return render_template("index.html")
 
 # ==========================================
 # CARGAR DATASET
@@ -303,6 +307,105 @@ def analizar():
 # ==========================================
 # RUN
 # ==========================================
+
+@app.route("/consultar", methods=["POST"])
+def consultar():
+
+    try:
+
+        cedula = request.form["cedula"]
+
+        cliente = df[
+            df["CEDULA"].astype(str) == cedula
+        ]
+
+        if cliente.empty:
+
+            return render_template(
+                "index.html",
+                resultado={
+                    "error": "Cliente no encontrado"
+                }
+            )
+
+        cliente = cliente.iloc[0]
+
+        nuevo_cliente = pd.DataFrame([{
+
+            'SALDO': cliente['SALDO'],
+            'MORA': cliente['MORA'],
+            'PAGOS': cliente['PAGOS'],
+            'PROMESAS': cliente['PROMESAS'],
+            'CONTACTOS': cliente['CONTACTOS'],
+            'GESTIONES_EFECTIVAS': cliente['GESTIONES_EFECTIVAS'],
+            'COMPROMISOS': cliente['COMPROMISOS'],
+            'SEGMENTO_CLIENTE': cliente['SEGMENTO_CLIENTE'],
+            'CIUDAD': cliente['CIUDAD'],
+            'PRODUCTO': cliente['PRODUCTO'],
+            'SECTOR': cliente['SECTOR'],
+            'TIPO_OBLIGACION': cliente['TIPO_OBLIGACION'],
+            'SALDO_EXTERNO': cliente['SALDO_EXTERNO'],
+            'CUOTA': cliente['CUOTA'],
+            'SCORE_EXTERNO': cliente['SCORE_EXTERNO']
+
+        }])
+
+        probabilidad = modelo.predict_proba(
+            nuevo_cliente
+        )[0][1]
+
+        resultado = {
+
+    "cedula": str(cliente["CEDULA"]),
+
+    "probabilidad": f"{round(float(probabilidad)*100,2)}%",
+
+    "nivel_riesgo": calcular_riesgo(
+        probabilidad,
+        cliente["MORA"],
+        cliente["SCORE_EXTERNO"]
+    ),
+
+    "prioridad": prioridad(
+        probabilidad,
+        cliente["SALDO"]
+    ),
+
+    "canal_recomendado": canal(
+        cliente["CONTACTOS"]
+    ),
+
+    "estrategia": estrategia(
+        probabilidad,
+        cliente["MORA"]
+    ),
+
+    "respuesta_ia": f"""
+Cliente analizado exitosamente.
+
+• Probabilidad de recuperación: {round(float(probabilidad)*100,2)}%
+• Nivel de riesgo: {calcular_riesgo(probabilidad, cliente["MORA"], cliente["SCORE_EXTERNO"])}
+• Prioridad: {prioridad(probabilidad, cliente["SALDO"])}
+• Canal recomendado: {canal(cliente["CONTACTOS"])}
+• Estrategia sugerida: {estrategia(probabilidad, cliente["MORA"])}
+
+La estrategia fue calculada con base en las variables históricas del cliente y el modelo predictivo entrenado.
+"""
+}
+
+        return render_template(
+            "index.html",
+            resultado=resultado
+        )
+
+    except Exception as e:
+
+        return render_template(
+            "index.html",
+            resultado={
+                "error": str(e)
+            }
+        )
 
 if __name__ == '__main__':
 

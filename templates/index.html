@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recovery AI Assistant</title>
+
+```
+<link rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}">
+```
+
+</head>
+
+<body>
+
+<div class="chat-wrapper">
+
+```
+<div class="chat-header">
+    <h1>🤖 Recovery AI Assistant</h1>
+    <p>Asistente Inteligente de Recuperación de Cartera</p>
+</div>
+
+<div class="chat-messages">
+
+    {% if resultado %}
+
+    <div class="message user">
+        <div class="bubble">
+            Analizar cliente {{ resultado.cedula }}
+        </div>
+    </div>
+
+    <div class="message bot">
+
+        <div class="avatar">🤖</div>
+
+        <div class="bubble">
+
+            <h3>📊 Resultado del análisis</h3>
+
+            <div class="metric-grid">
+
+                <div class="metric-card">
+                    <span>Probabilidad</span>
+                    <strong>{{ resultado.probabilidad }}</strong>
+                </div>
+
+                <div class="metric-card">
+                    <span>Riesgo</span>
+                    <strong>{{ resultado.nivel_riesgo }}</strong>
+                </div>
+
+                <div class="metric-card">
+                    <span>Prioridad</span>
+                    <strong>{{ resultado.prioridad }}</strong>
+                </div>
+
+            </div>
+
+            <div class="details">
+
+                <p>
+                    <strong>Canal recomendado:</strong>
+                    {{ resultado.canal_recomendado }}
+                </p>
+
+                <p>
+                    <strong>Estrategia:</strong>
+                    {{ resultado.estrategia }}
+                </p>
+
+            </div>
+
+            {% if resultado.respuesta_ia %}
+
+            <div class="ia-response">
+
+                <h4>🤖 Recomendación IA</h4>
+
+                <p style="white-space: pre-line;">
+                    {{ resultado.respuesta_ia }}
+                </p>
+
+            </div>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+</div>
+
+<form method="POST"
+      action="/consultar"
+      class="chat-input">
+
+    <input
+        type="text"
+        name="cedula"
+        placeholder="Consulta una cédula..."
+        required>
+
+    <button type="submit">
+        Analizar
+    </button>
+
+</form>
+```
+
+</div>
+
+</body>
+</html>
