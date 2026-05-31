@@ -1,6 +1,8 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, Response
 import pandas as pd
 import joblib
+import requests
+import json
 from sklearn.preprocessing import LabelEncoder
 
 # ==========================================
@@ -64,248 +66,345 @@ columnas_texto = [
 ]
 
 for col in columnas_texto:
-
     le = LabelEncoder()
-
-    df[col] = le.fit_transform(
-        df[col].astype(str)
-    )
-
+    df[col] = le.fit_transform(df[col].astype(str))
     label_encoders[col] = le
+
+# ==========================================
+# FUNCION RESPUESTA JSON LIMPIA
+# ==========================================
+
+def responder(datos):
+    return Response(
+        json.dumps(datos, ensure_ascii=False),
+        content_type='application/json; charset=utf-8'
+    )
 
 # ==========================================
 # FUNCIONES IA
 # ==========================================
 
 def calcular_riesgo(probabilidad, mora, score):
-
     if mora >= 720 or score <= 3:
         return "ALTO"
-
     elif mora >= 360 or score <= 6:
         return "MEDIO"
-
     else:
         return "BAJO"
 
 # ==========================================
 
 def estrategia(probabilidad, mora):
-
     if mora < 180:
         return "SEGUIMIENTO PREVENTIVO"
-
     if probabilidad >= 0.75:
         return "ACUERDO DE PAGO"
-
     elif probabilidad >= 0.45:
         return "NEGOCIACION"
-
     else:
         return "COBRANZA JURIDICA"
 
 # ==========================================
 
 def prioridad(probabilidad, saldo):
-
     if probabilidad >= 0.70 and saldo >= 5000000:
         return "ALTA"
-
     elif probabilidad >= 0.40:
         return "MEDIA"
-
     else:
         return "BAJA"
 
 # ==========================================
 
 def canal(contactos):
-
     if contactos >= 3:
         return "LLAMADA"
-
     elif contactos >= 1:
         return "WHATSAPP"
-
     else:
         return "SMS"
 
 # ==========================================
-# ENDPOINT
+# CONFIGURACION OLLAMA
+# ==========================================
+
+OLLAMA_URL = "http://localhost:11434/api/chat"
+OLLAMA_MODEL = "mistral"
+
+# ==========================================
+# FUNCIONES OLLAMA
+# ==========================================
+
+def llamar_ollama(mensajes):
+    payload = {
+        "model": OLLAMA_MODEL,
+        "messages": mensajes,
+        "stream": False
+    }
+    resp = requests.post(OLLAMA_URL, json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp.json()["message"]["content"]
+
+# ==========================================
+
+def extraer_cedula_con_ia(texto_usuario):
+    mensajes = [
+        {
+            "role": "system",
+            "content": (
+                "Eres un extractor de datos. Tu única tarea es identificar si el usuario "
+                "menciona un número de cédula o identificación en su mensaje. "
+                "Si encuentras un número que parece una cédula (entre 6 y 12 dígitos), "
+                "responde ÚNICAMENTE con ese número, sin texto adicional. "
+                "Si NO hay cédula en el mensaje, responde exactamente: SIN_CEDULA"
+            )
+        },
+        {
+            "role": "user",
+            "content": texto_usuario
+        }
+    ]
+    resultado = llamar_ollama(mensajes).strip()
+    if resultado.isdigit():
+        return resultado
+    return None
+
+# ==========================================
+
+def limpiar_texto(texto):
+    return texto.replace('\n\n', ' ').replace('\n', ' ').strip()
+
+# ==========================================
+
+def generar_respuesta_ejecutiva(datos_cliente, pregunta_usuario):
+    contexto = f"""
+    Cédula: {datos_cliente['cedula']}
+    Probabilidad de recuperación: {datos_cliente['probabilidad'] * 100:.0f}%
+    Nivel de riesgo: {datos_cliente['nivel_riesgo']}
+    Días en mora: {datos_cliente['mora']}
+    Saldo: ${datos_cliente['saldo']:,.0f}
+    Score externo: {datos_cliente['score_externo']}
+    Estrategia recomendada: {datos_cliente['estrategia']}
+    Prioridad de gestión: {datos_cliente['prioridad_gestion']}
+    Canal recomendado: {datos_cliente['canal_recomendado']}
+    Pagos realizados: {datos_cliente['pagos']}
+    Contactos previos: {datos_cliente['contactos']}
+    Gestiones efectivas: {datos_cliente['gestiones_efectivas']}
+    Compromisos: {datos_cliente['compromisos']}
+    """
+
+    mensajes = [
+        {
+            "role": "system",
+            "content": (
+                "Eres un analista experto en recuperación de cartera bancaria. "
+                "Hablas de forma ejecutiva, clara y profesional. "
+                "Recibes datos de un cliente en mora y respondes la consulta del asesor. "
+                "Nunca inventas información. Solo usas los datos que te proporcionan. "
+                "Tus respuestas son concisas pero completas. Máximo 5 párrafos cortos. "
+                "Siempre terminas con una recomendación de acción concreta."
+            )
+        },
+        {
+            "role": "user",
+            "content": f"Datos del cliente:\n{contexto}\n\nPregunta del asesor: {pregunta_usuario}"
+        }
+    ]
+
+    respuesta = llamar_ollama(mensajes)
+    return limpiar_texto(respuesta)
+
+# ==========================================
+# ENDPOINT ANALIZAR (original)
 # ==========================================
 
 @app.route('/analizar', methods=['POST'])
-
 def analizar():
 
     try:
 
         data = request.json
-
         cedula = str(data["cedula"])
 
-        # ======================================
-        # BUSCAR CLIENTE
-        # ======================================
-
-        cliente = df[
-            df["CEDULA"].astype(str) == cedula
-        ]
+        cliente = df[df["CEDULA"].astype(str) == cedula]
 
         if cliente.empty:
-
-            return jsonify({
-                "error": "Cliente no encontrado"
-            })
+            return responder({"error": "Cliente no encontrado"})
 
         cliente = cliente.iloc[0]
 
+        nuevo_cliente = pd.DataFrame([{
+            'SALDO':               cliente['SALDO'],
+            'MORA':                cliente['MORA'],
+            'PAGOS':               cliente['PAGOS'],
+            'PROMESAS':            cliente['PROMESAS'],
+            'CONTACTOS':           cliente['CONTACTOS'],
+            'GESTIONES_EFECTIVAS': cliente['GESTIONES_EFECTIVAS'],
+            'COMPROMISOS':         cliente['COMPROMISOS'],
+            'SEGMENTO_CLIENTE':    cliente['SEGMENTO_CLIENTE'],
+            'CIUDAD':              cliente['CIUDAD'],
+            'PRODUCTO':            cliente['PRODUCTO'],
+            'SECTOR':              cliente['SECTOR'],
+            'TIPO_OBLIGACION':     cliente['TIPO_OBLIGACION'],
+            'SALDO_EXTERNO':       cliente['SALDO_EXTERNO'],
+            'CUOTA':               cliente['CUOTA'],
+            'SCORE_EXTERNO':       cliente['SCORE_EXTERNO']
+        }])
+
+        probabilidad = modelo.predict_proba(nuevo_cliente)[0][1]
+
+        riesgo        = calcular_riesgo(probabilidad, cliente["MORA"], cliente["SCORE_EXTERNO"])
+        estrategia_ia = estrategia(probabilidad, cliente["MORA"])
+        prioridad_ia  = prioridad(probabilidad, cliente["SALDO"])
+        canal_ia      = canal(cliente["CONTACTOS"])
+
+        resultado = {
+            "cedula":              str(cliente["CEDULA"]),
+            "probabilidad":        round(float(probabilidad), 2),
+            "nivel_riesgo":        riesgo,
+            "prioridad_gestion":   prioridad_ia,
+            "canal_recomendado":   canal_ia,
+            "estrategia":          estrategia_ia,
+            "mora":                int(cliente["MORA"]),
+            "saldo":               float(cliente["SALDO"]),
+            "score_externo":       float(cliente["SCORE_EXTERNO"]),
+            "pagos":               int(cliente["PAGOS"]),
+            "contactos":           int(cliente["CONTACTOS"]),
+            "gestiones_efectivas": int(cliente["GESTIONES_EFECTIVAS"]),
+            "compromisos":         int(cliente["COMPROMISOS"])
+        }
+
+        return responder(resultado)
+
+    except Exception as e:
+        return responder({"error": str(e)})
+
+# ==========================================
+# ENDPOINT CHAT (lenguaje natural)
+# ==========================================
+
+@app.route('/chat', methods=['POST'])
+def chat():
+
+    try:
+
+        data = request.json
+        mensaje_usuario = str(data.get("mensaje", "")).strip()
+
+        if not mensaje_usuario:
+            return responder({"error": "El campo 'mensaje' es requerido"})
+
         # ======================================
-        # DATAFRAME EXACTO DEL MODELO
+        # PASO 1: EXTRAER CEDULA
+        # ======================================
+
+        cedula = extraer_cedula_con_ia(mensaje_usuario)
+
+        if not cedula:
+
+            mensajes = [
+                {
+                    "role": "system",
+                    "content": (
+                        "Eres un asistente experto en recuperación de cartera bancaria. "
+                        "Si el usuario no menciona una cédula, oriéntalo para que la proporcione "
+                        "o responde consultas generales sobre cobranza y recuperación. "
+                        "Sé profesional y conciso."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": mensaje_usuario
+                }
+            ]
+
+            respuesta_general = llamar_ollama(mensajes)
+            respuesta_general = limpiar_texto(respuesta_general)
+
+            return responder({
+                "tipo":      "general",
+                "respuesta": respuesta_general
+            })
+
+        # ======================================
+        # PASO 2: BUSCAR CLIENTE
+        # ======================================
+
+        cliente_df = df[df["CEDULA"].astype(str) == cedula]
+
+        if cliente_df.empty:
+            return responder({
+                "tipo":      "error",
+                "respuesta": f"No encontré ningún cliente con la cédula {cedula} en la base de datos."
+            })
+
+        cliente = cliente_df.iloc[0]
+
+        # ======================================
+        # PASO 3: PREDICCION
         # ======================================
 
         nuevo_cliente = pd.DataFrame([{
-
-            'SALDO':
-            cliente['SALDO'],
-
-            'MORA':
-            cliente['MORA'],
-
-            'PAGOS':
-            cliente['PAGOS'],
-
-            'PROMESAS':
-            cliente['PROMESAS'],
-
-            'CONTACTOS':
-            cliente['CONTACTOS'],
-
-            'GESTIONES_EFECTIVAS':
-            cliente['GESTIONES_EFECTIVAS'],
-
-            'COMPROMISOS':
-            cliente['COMPROMISOS'],
-
-            'SEGMENTO_CLIENTE':
-            cliente['SEGMENTO_CLIENTE'],
-
-            'CIUDAD':
-            cliente['CIUDAD'],
-
-            'PRODUCTO':
-            cliente['PRODUCTO'],
-
-            'SECTOR':
-            cliente['SECTOR'],
-
-            'TIPO_OBLIGACION':
-            cliente['TIPO_OBLIGACION'],
-
-            'SALDO_EXTERNO':
-            cliente['SALDO_EXTERNO'],
-
-            'CUOTA':
-            cliente['CUOTA'],
-
-            'SCORE_EXTERNO':
-            cliente['SCORE_EXTERNO']
-
+            'SALDO':               cliente['SALDO'],
+            'MORA':                cliente['MORA'],
+            'PAGOS':               cliente['PAGOS'],
+            'PROMESAS':            cliente['PROMESAS'],
+            'CONTACTOS':           cliente['CONTACTOS'],
+            'GESTIONES_EFECTIVAS': cliente['GESTIONES_EFECTIVAS'],
+            'COMPROMISOS':         cliente['COMPROMISOS'],
+            'SEGMENTO_CLIENTE':    cliente['SEGMENTO_CLIENTE'],
+            'CIUDAD':              cliente['CIUDAD'],
+            'PRODUCTO':            cliente['PRODUCTO'],
+            'SECTOR':              cliente['SECTOR'],
+            'TIPO_OBLIGACION':     cliente['TIPO_OBLIGACION'],
+            'SALDO_EXTERNO':       cliente['SALDO_EXTERNO'],
+            'CUOTA':               cliente['CUOTA'],
+            'SCORE_EXTERNO':       cliente['SCORE_EXTERNO']
         }])
 
-        # ======================================
-        # PREDICCION
-        # ======================================
-
-        probabilidad = modelo.predict_proba(
-            nuevo_cliente
-        )[0][1]
+        probabilidad = modelo.predict_proba(nuevo_cliente)[0][1]
 
         # ======================================
-        # VARIABLES IA
+        # PASO 4: ARMAR DATOS CLIENTE
         # ======================================
 
-        riesgo = calcular_riesgo(
-            probabilidad,
-            cliente["MORA"],
-            cliente["SCORE_EXTERNO"]
-        )
-
-        estrategia_ia = estrategia(
-            probabilidad,
-            cliente["MORA"]
-        )
-
-        prioridad_ia = prioridad(
-            probabilidad,
-            cliente["SALDO"]
-        )
-
-        canal_ia = canal(
-            cliente["CONTACTOS"]
-        )
-
-        # ======================================
-        # RESPUESTA FINAL
-        # ======================================
-
-        respuesta = {
-
-            "cedula":
-            str(cliente["CEDULA"]),
-
-            "probabilidad":
-            round(float(probabilidad), 2),
-
-            "nivel_riesgo":
-            riesgo,
-
-            "prioridad_gestion":
-            prioridad_ia,
-
-            "canal_recomendado":
-            canal_ia,
-
-            "estrategia":
-            estrategia_ia,
-
-            "mora":
-            int(cliente["MORA"]),
-
-            "saldo":
-            float(cliente["SALDO"]),
-
-            "score_externo":
-            float(cliente["SCORE_EXTERNO"]),
-
-            "pagos":
-            int(cliente["PAGOS"]),
-
-            "contactos":
-            int(cliente["CONTACTOS"]),
-
-            "gestiones_efectivas":
-            int(cliente["GESTIONES_EFECTIVAS"]),
-
-            "compromisos":
-            int(cliente["COMPROMISOS"])
-
+        datos_cliente = {
+            "cedula":              str(cliente["CEDULA"]),
+            "probabilidad":        round(float(probabilidad), 2),
+            "nivel_riesgo":        calcular_riesgo(probabilidad, cliente["MORA"], cliente["SCORE_EXTERNO"]),
+            "prioridad_gestion":   prioridad(probabilidad, cliente["SALDO"]),
+            "canal_recomendado":   canal(cliente["CONTACTOS"]),
+            "estrategia":          estrategia(probabilidad, cliente["MORA"]),
+            "mora":                int(cliente["MORA"]),
+            "saldo":               float(cliente["SALDO"]),
+            "score_externo":       float(cliente["SCORE_EXTERNO"]),
+            "pagos":               int(cliente["PAGOS"]),
+            "contactos":           int(cliente["CONTACTOS"]),
+            "gestiones_efectivas": int(cliente["GESTIONES_EFECTIVAS"]),
+            "compromisos":         int(cliente["COMPROMISOS"])
         }
 
-        return jsonify(respuesta)
+        # ======================================
+        # PASO 5: RESPUESTA CONVERSACIONAL
+        # ======================================
+
+        respuesta_ia = generar_respuesta_ejecutiva(datos_cliente, mensaje_usuario)
+
+        return responder({
+            "tipo":      "analisis",
+            "cedula":    cedula,
+            "datos":     datos_cliente,
+            "respuesta": respuesta_ia
+        })
 
     except Exception as e:
-
-        return jsonify({
-            "error": str(e)
-        })
+        return responder({"error": str(e)})
 
 # ==========================================
 # RUN
 # ==========================================
 
 if __name__ == '__main__':
-
     app.run(
         port=5000,
         debug=False
