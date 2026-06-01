@@ -97,6 +97,26 @@ Response
   "mora": 420,
   "score_externo": 6
 }
+📡 Endpoint Extendido
+POST /probabilidad_contacto
+Request (JSON):
+{
+  "cedula": "1000270337"
+}
+
+Response (JSON): incluye todos los campos del endpoint `/analizar` más:
+- `probabilidad_contacto`: probabilidad estimada (0..1) de contactar al cliente.
+- `recomendacion_asignacion`: una de `INTERNA`, `EXTERNA`, `CAMPAÑA`, `JURIDICA`.
+- `asignacion_razon`: explicación breve de la recomendación.
+
+Notas sobre `/probabilidad_contacto`:
+- La `probabilidad_contacto` se calcula mediante una heurística que combina
+  `CONTACTOS`, `GESTIONES_EFECTIVAS`, `PAGOS`, `MORA` y `SCORE_EXTERNO`, normalizados
+  según los máximos observados en el dataset.
+- La `recomendacion_asignacion` usa reglas sencillas que combinan la probabilidad
+  de recuperación (modelo), la probabilidad de contacto y el nivel de riesgo.
+- Puedes ajustar los pesos o reemplazar la heurística por un modelo entrenado
+  si buscas una estimación más precisa.
 🧮 Variables Utilizadas
 
 El modelo utiliza las siguientes variables:
