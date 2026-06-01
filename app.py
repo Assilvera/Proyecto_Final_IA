@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import pandas as pd
 import joblib
 from sklearn.preprocessing import LabelEncoder
@@ -429,6 +429,10 @@ def stats():
 # ==========================================
 # RUN
 # ==========================================
+
+@app.route('/dashboard')
+def dashboard():
+    return send_from_directory('.', 'dashboard.html')
 
 if __name__ == '__main__':
 
