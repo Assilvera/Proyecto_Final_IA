@@ -1,5 +1,4 @@
-from flask import Flask, request, jsonify
-import numpy as np
+from flask import Flask, request, jsonify, render_template  
 import pandas as pd
 import joblib
 from sklearn.preprocessing import LabelEncoder
@@ -10,6 +9,10 @@ from datetime import datetime
 # ==========================================
 
 app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return render_template("index.html")
 
 # ==========================================
 # CARGAR DATASET
@@ -131,6 +134,22 @@ def canal(contactos):
 
     else:
         return "SMS"
+
+# ==========================================
+
+def generar_respuesta_ia(probabilidad, cliente, riesgo, prioridad_ia, canal_ia, estrategia_ia):
+
+    prob_pct = round(float(probabilidad) * 100, 2)
+
+    return f"""Cliente analizado exitosamente.
+
+• Probabilidad de recuperación: {prob_pct}%
+• Nivel de riesgo: {riesgo}
+• Prioridad: {prioridad_ia}
+• Canal recomendado: {canal_ia}
+• Estrategia sugerida: {estrategia_ia}
+
+La estrategia fue calculada con base en las variables históricas del cliente y el modelo predictivo entrenado."""
 
 # ==========================================
 # ENDPOINT
@@ -270,6 +289,16 @@ def analizar():
 
             "estrategia":
             estrategia_ia,
+
+            "respuesta_ia":
+            generar_respuesta_ia(
+                probabilidad,
+                cliente,
+                riesgo,
+                prioridad_ia,
+                canal_ia,
+                estrategia_ia
+            ),
 
             "mora":
             int(cliente["MORA"]),
@@ -842,6 +871,108 @@ def insights_operativos():
 # ==========================================
 # RUN
 # ==========================================
+
+@app.route("/consultar", methods=["POST"])
+def consultar():
+
+    try:
+
+        cedula = request.form["cedula"]
+
+        cliente = df[
+            df["CEDULA"].astype(str) == cedula
+        ]
+
+        if cliente.empty:
+
+            return render_template(
+                "index.html",
+                resultado={
+                    "error": "Cliente no encontrado"
+                }
+            )
+
+        cliente = cliente.iloc[0]
+
+        nuevo_cliente = pd.DataFrame([{
+
+            'SALDO': cliente['SALDO'],
+            'MORA': cliente['MORA'],
+            'PAGOS': cliente['PAGOS'],
+            'PROMESAS': cliente['PROMESAS'],
+            'CONTACTOS': cliente['CONTACTOS'],
+            'GESTIONES_EFECTIVAS': cliente['GESTIONES_EFECTIVAS'],
+            'COMPROMISOS': cliente['COMPROMISOS'],
+            'SEGMENTO_CLIENTE': cliente['SEGMENTO_CLIENTE'],
+            'CIUDAD': cliente['CIUDAD'],
+            'PRODUCTO': cliente['PRODUCTO'],
+            'SECTOR': cliente['SECTOR'],
+            'TIPO_OBLIGACION': cliente['TIPO_OBLIGACION'],
+            'SALDO_EXTERNO': cliente['SALDO_EXTERNO'],
+            'CUOTA': cliente['CUOTA'],
+            'SCORE_EXTERNO': cliente['SCORE_EXTERNO']
+
+        }])
+
+        probabilidad = modelo.predict_proba(
+            nuevo_cliente
+        )[0][1]
+
+        riesgo = calcular_riesgo(
+            probabilidad,
+            cliente["MORA"],
+            cliente["SCORE_EXTERNO"]
+        )
+
+        prioridad_ia = prioridad(
+            probabilidad,
+            cliente["SALDO"]
+        )
+
+        canal_ia = canal(cliente["CONTACTOS"])
+
+        estrategia_ia = estrategia(
+            probabilidad,
+            cliente["MORA"]
+        )
+
+        resultado = {
+
+            "cedula": str(cliente["CEDULA"]),
+
+            "probabilidad": f"{round(float(probabilidad)*100,2)}%",
+
+            "nivel_riesgo": riesgo,
+
+            "prioridad": prioridad_ia,
+
+            "canal_recomendado": canal_ia,
+
+            "estrategia": estrategia_ia,
+
+            "respuesta_ia": generar_respuesta_ia(
+                probabilidad,
+                cliente,
+                riesgo,
+                prioridad_ia,
+                canal_ia,
+                estrategia_ia
+            )
+        }
+
+        return render_template(
+            "index.html",
+            resultado=resultado
+        )
+
+    except Exception as e:
+
+        return render_template(
+            "index.html",
+            resultado={
+                "error": str(e)
+            }
+        )
 
 if __name__ == '__main__':
 
