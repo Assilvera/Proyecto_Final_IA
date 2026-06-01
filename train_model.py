@@ -45,6 +45,7 @@ target = 'TARGET'
 # ENCODE VARIABLES TEXTO
 # =========================
 
+
 label_encoders = {}
 
 for col in features:
@@ -53,6 +54,13 @@ for col in features:
     df[col] = le.fit_transform(df[col].astype(str))
     label_encoders[col] = le
 
+
+
+label_encoders = {}
+for col in columnas_texto:
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col].astype(str))
+    label_encoders[col] = le
 # =========================
 # X Y y
 # =========================
