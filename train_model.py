@@ -45,22 +45,15 @@ target = 'TARGET'
 # ENCODE VARIABLES TEXTO
 # =========================
 
-# =========================
-# ENCODE VARIABLES TEXTO
-# =========================
-columnas_texto = [
-    'SEGMENTO_CLIENTE',
-    'CIUDAD',
-    'PRODUCTO',
-    'SECTOR',
-    'TIPO_OBLIGACION'
-]
 
 label_encoders = {}
-for col in columnas_texto:
+
+for col in features:
+    # Forzar conversión a texto y aplicar LabelEncoder a todas las columnas
     le = LabelEncoder()
     df[col] = le.fit_transform(df[col].astype(str))
     label_encoders[col] = le
+
 # =========================
 # X Y y
 # =========================

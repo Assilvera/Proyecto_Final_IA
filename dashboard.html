@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recovery Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f12;
+    --bg2: #13161b;
+    --bg3: #1a1e26;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8eaf0;
+    --muted: #7a8090;
+    --faint: #3a3f4a;
+    --green: #00d88a;
+    --green-dim: rgba(0,216,138,0.12);
+    --amber: #f5a623;
+    --amber-dim: rgba(245,166,35,0.12);
+    --red: #ff5252;
+    --red-dim: rgba(255,82,82,0.12);
+    --blue: #4d9fff;
+    --blue-dim: rgba(77,159,255,0.12);
+    --purple: #a78bfa;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* LAYOUT */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 220px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 0;
+    z-index: 100;
+  }
+
+  .sidebar-logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-logo .logo-label {
+    font-size: 11px; letter-spacing: 0.12em; color: var(--muted);
+    text-transform: uppercase; font-weight: 500;
+  }
+  .sidebar-logo .logo-title {
+    font-size: 17px; font-weight: 600; color: var(--text);
+    margin-top: 4px; line-height: 1.2;
+  }
+  .sidebar-logo .logo-dot {
+    display: inline-block; width: 7px; height: 7px;
+    background: var(--green); border-radius: 50%;
+    margin-right: 6px; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .nav { padding: 16px 12px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: var(--radius-sm);
+    color: var(--muted); font-size: 13px; font-weight: 400;
+    cursor: pointer; transition: all 0.15s;
+    margin-bottom: 2px; border: none; background: none;
+    width: 100%; text-align: left;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-item.active { background: rgba(77,159,255,0.1); color: var(--blue); }
+  .nav-icon { font-size: 16px; width: 18px; }
+
+  .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+
+  /* HEADER */
+  .page-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 28px;
+  }
+  .page-title { font-size: 22px; font-weight: 600; color: var(--text); }
+  .page-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+  .btn {
+    padding: 8px 16px; border-radius: var(--radius-sm); font-size: 13px;
+    font-weight: 500; cursor: pointer; border: 1px solid var(--border2);
+    background: var(--bg3); color: var(--text); font-family: var(--font);
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color: var(--blue); color: var(--blue); }
+  .btn-primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn-primary:hover { background: #6eb0ff; color: #fff; }
+  .refresh-time { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+  /* METRICS GRID */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .metric-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px;
+    transition: border-color 0.2s;
+  }
+  .metric-card:hover { border-color: var(--border2); }
+  .metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.08em; font-weight: 500; margin-bottom: 8px; }
+  .metric-value { font-size: 28px; font-weight: 600; line-height: 1; }
+  .metric-value.green { color: var(--green); }
+  .metric-value.amber { color: var(--amber); }
+  .metric-value.red { color: var(--red); }
+  .metric-value.blue { color: var(--blue); }
+  .metric-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .metric-trend {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; font-weight: 500; margin-top: 6px;
+    padding: 2px 7px; border-radius: 99px;
+  }
+  .trend-up { background: var(--green-dim); color: var(--green); }
+  .trend-down { background: var(--red-dim); color: var(--red); }
+  .trend-neutral { background: var(--amber-dim); color: var(--amber); }
+
+  /* CHARTS */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .charts-row-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .card-sub { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+  .chart-wrap { position: relative; }
+
+  /* LEGEND */
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+  /* INSIGHTS */
+  .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .insight-card {
+    border-radius: var(--radius); padding: 16px 18px;
+    border-left: 3px solid;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .insight-card.alerta { background: var(--red-dim); border-color: var(--red); }
+  .insight-card.oportunidad { background: var(--green-dim); border-color: var(--green); }
+  .insight-card.info { background: var(--blue-dim); border-color: var(--blue); }
+  .insight-card.warning { background: var(--amber-dim); border-color: var(--amber); }
+  .insight-icon { font-size: 18px; margin-top: 1px; }
+  .insight-card.alerta .insight-icon { color: var(--red); }
+  .insight-card.oportunidad .insight-icon { color: var(--green); }
+  .insight-card.info .insight-icon { color: var(--blue); }
+  .insight-card.warning .insight-icon { color: var(--amber); }
+  .insight-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+  .insight-text { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 500; padding: 8px 12px;
+    border-bottom: 1px solid var(--border); text-align: left; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 500;
+    padding: 2px 8px; border-radius: 99px;
+  }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+
+  /* SEARCH SECTION */
+  .search-section { margin-bottom: 20px; }
+  .search-row { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .search-input {
+    flex: 1; max-width: 360px; padding: 10px 14px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: var(--radius-sm); color: var(--text); font-family: var(--font);
+    font-size: 13px; outline: none; transition: border-color 0.15s;
+  }
+  .search-input:focus { border-color: var(--blue); }
+  .search-input::placeholder { color: var(--faint); }
+
+  /* PROB BAR */
+  .prob-bar-track { background: var(--bg3); border-radius: 99px; height: 6px; flex: 1; overflow: hidden; }
+  .prob-bar-fill { height: 6px; border-radius: 99px; transition: width 0.6s ease; }
+
+  /* LOADING */
+  .loading { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; padding: 40px 0; justify-content: center; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* SECTION HEADER */
+  .section-header { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin: 28px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 3px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 20px; }
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .charts-row, .charts-row-3, .insights-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ANIMATIONS */
+  .fade-in { animation: fadeIn 0.4s ease forwards; opacity: 0; }
+  @keyframes fadeIn { to { opacity: 1; } }
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+
+  /* RESULT PANEL */
+  #resultPanel {
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: var(--radius); padding: 20px; display: none; margin-top: 12px;
+  }
+  .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .result-cedula { font-size: 15px; font-weight: 500; }
+  .result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+  .result-item { }
+  .result-item-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .result-item-val { font-size: 14px; font-weight: 500; font-family: var(--mono); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-label">Sistema IA</div>
+    <div class="logo-title"><span class="logo-dot"></span>Recovery</div>
+  </div>
+  <nav class="nav">
+    <button class="nav-item active" onclick="showTab('dashboard')">
+      <span class="nav-icon">📊</span> Dashboard
+    </button>
+    <button class="nav-item" onclick="showTab('clientes')">
+      <span class="nav-icon">🔍</span> Consulta cliente
+    </button>
+    <button class="nav-item" onclick="showTab('insights')">
+      <span class="nav-icon">💡</span> Insights
+    </button>
+    <button class="nav-item" onclick="showTab('top')">
+      <span class="nav-icon">🏆</span> Top cartera
+    </button>
+  </nav>
+  <div style="padding:16px 20px;border-top:1px solid var(--border)">
+    <div style="font-size:11px;color:var(--muted)">API Flask</div>
+    <div style="font-size:12px;color:var(--faint);font-family:var(--mono);margin-top:2px">localhost:5000</div>
+    <div id="apiStatus" style="font-size:11px;margin-top:6px;color:var(--muted)">⏳ Conectando...</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- === TAB: DASHBOARD === -->
+  <div id="tab-dashboard">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Dashboard de recuperación</div>
+        <div class="page-sub" id="lastUpdate">Cargando datos...</div>
+      </div>
+      <div class="header-actions">
+        <span class="refresh-time" id="clock"></span>
+        <button class="btn" onclick="loadStats()">↻ Actualizar</button>
+      </div>
+    </div>
+
+    <div id="loadingMain" class="loading">
+      <div class="spinner"></div> Conectando con el API de Recovery...
+    </div>
+
+    <div id="dashContent" style="display:none">
+      <!-- KPIs -->
+      <div class="metrics">
+        <div class="metric-card fade-in stagger-1">
+          <div class="metric-label">Clientes en mora</div>
+          <div class="metric-value blue" id="kpi-total">—</div>
+          <div class="metric-sub">cartera activa total</div>
+        </div>
+        <div class="metric-card fade-in stagger-2">
+          <div class="metric-label">Prob. recuperación</div>
+          <div class="metric-value green" id="kpi-prob">—</div>
+          <div class="metric-sub">promedio del portafolio</div>
+        </div>
+        <div class="metric-card fade-in stagger-3">
+          <div class="metric-label">Riesgo alto</div>
+          <div class="metric-value red" id="kpi-alto">—</div>
+          <div class="metric-sub">mora ≥ 720 días</div>
+        </div>
+        <div class="metric-card fade-in stagger-4">
+          <div class="metric-label">Prioridad alta</div>
+          <div class="metric-value amber" id="kpi-prio">—</div>
+          <div class="metric-sub">gestión urgente</div>
+        </div>
+      </div>
+
+      <div class="metrics" style="margin-bottom:24px">
+        <div class="metric-card">
+          <div class="metric-label">Saldo total cartera</div>
+          <div class="metric-value" id="kpi-saldo" style="font-size:20px">—</div>
+          <div class="metric-sub">suma de saldos activos</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Mora promedio</div>
+          <div class="metric-value amber" id="kpi-mora" style="font-size:22px">—</div>
+          <div class="metric-sub">días en mora (promedio)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Gestiones efectivas</div>
+          <div class="metric-value green" id="kpi-gest" style="font-size:22px">—</div>
+          <div class="metric-sub">total acumulado</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Score promedio</div>
+          <div class="metric-value" id="kpi-score" style="font-size:22px">—</div>
+          <div class="metric-sub">score externo cartera</div>
+        </div>
+      </div>
+
+      <p class="section-header">Distribución de cartera</p>
+
+      <div class="charts-row">
+        <div class="card">
+          <div class="card-title">Histograma de probabilidad de recuperación</div>
+          <div class="card-sub">Número de clientes por rango de probabilidad</div>
+          <div class="chart-wrap" style="height:200px">
+            <canvas id="chartHist" role="img" aria-label="Histograma de probabilidad de recuperación">Distribución por deciles</canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Estrategia recomendada</div>
+          <div class="card-sub">Distribución por tipo de gestión</div>
+          <div id="legEstrategia" class="legend"></div>
+          <div class="chart-wrap" style="height:180px">
+            <canvas id="chartEstrategia" role="img" aria-label="Distribución por estrategia">Estrategias de cobranza</canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="card">
+          <div class="card-title">Nivel de riesgo</div>
+          <div class="card-sub">Clasificación del portafolio</div>
+          <div id="legRiesgo" class="legend"></div>
+          <div class="chart-wrap" style="height:180px">
+            <canvas id="chartRiesgo" role="img" aria-label="Distribución por riesgo">Alto, Medio, Bajo</canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Canal de contacto recomendado</div>
+          <div class="card-sub">Por frecuencia de contactos previos</div>
+          <div id="legCanal" class="legend"></div>
+          <div class="chart-wrap" style="height:180px">
+            <canvas id="chartCanal" role="img" aria-label="Canal recomendado">Llamada, WhatsApp, SMS</canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === TAB: CONSULTA === -->
+  <div id="tab-clientes" style="display:none">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Consulta de cliente</div>
+        <div class="page-sub">Análisis individual por cédula</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="search-row">
+        <input class="search-input" id="cedulaInput" type="text" placeholder="Número de cédula..." />
+        <button class="btn btn-primary" onclick="consultarCliente()">Analizar →</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted)">Conectado a <span style="font-family:var(--mono);color:var(--faint)">http://127.0.0.1:5000/analizar</span></div>
+
+      <div id="clientLoading" style="display:none" class="loading">
+        <div class="spinner"></div> Consultando modelo...
+      </div>
+
+      <div id="resultPanel">
+        <div class="result-header">
+          <div>
+            <div class="result-cedula" id="res-cedula">—</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Resultado del análisis ML</div>
+          </div>
+          <span class="badge" id="res-riesgo-badge">—</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <span style="font-size:12px;color:var(--muted);min-width:90px">Probabilidad</span>
+          <div class="prob-bar-track"><div class="prob-bar-fill" id="probBar"></div></div>
+          <span style="font-size:15px;font-weight:600;font-family:var(--mono);min-width:40px" id="res-prob">—</span>
+        </div>
+        <div class="result-grid" id="resGrid"></div>
+      </div>
+      <div id="clientError" style="display:none;font-size:12px;color:var(--red);margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- === TAB: INSIGHTS === -->
+  <div id="tab-insights" style="display:none">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Insights operativos</div>
+        <div class="page-sub">Generados automáticamente por el modelo predictivo</div>
+      </div>
+      <button class="btn" onclick="loadStats()">↻ Regenerar</button>
+    </div>
+    <div id="insightsGrid" class="insights-grid">
+      <div class="loading"><div class="spinner"></div> Generando insights...</div>
+    </div>
+    <div id="moraCard" style="display:none" class="card">
+      <div class="card-title">Mora promedio por nivel de riesgo</div>
+      <div class="card-sub">Días promedio en mora según clasificación de riesgo del cliente</div>
+      <div class="chart-wrap" style="height:200px">
+        <canvas id="chartMora" role="img" aria-label="Mora por nivel de riesgo">Mora promedio por riesgo</canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- === TAB: TOP === -->
+  <div id="tab-top" style="display:none">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Top cartera recuperable</div>
+        <div class="page-sub">Clientes con mayor saldo y probabilidad ≥ 60% — prioridad de gestión</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table id="topTable">
+          <thead>
+            <tr>
+              <th>Cédula</th>
+              <th>Saldo</th>
+              <th>Mora (días)</th>
+              <th>Probabilidad</th>
+              <th>Estrategia</th>
+              <th>Canal</th>
+              <th>Riesgo</th>
+              <th>Prioridad</th>
+            </tr>
+          </thead>
+          <tbody id="topBody">
+            <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px">Cargando datos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// =============================================
+// ESTADO Y DATOS
+// =============================================
+let statsData = null;
+let charts = {};
+
+const API = 'http://127.0.0.1:5000';
+
+// Datos mock para modo demo (sin API)
+const MOCK_DATA = {
+  kpis: {
+    total_clientes: 1247, prob_promedio: 0.58, saldo_total: 18750000000,
+    mora_promedio: 482, score_promedio: 5.4, clientes_riesgo_alto: 312,
+    clientes_prioridad_alta: 289, gestiones_efectivas: 4830, compromisos_total: 1102, pagos_total: 763
+  },
+  distribuciones: {
+    riesgo: { ALTO: 312, MEDIO: 528, BAJO: 407 },
+    estrategia: { 'ACUERDO DE PAGO': 458, 'NEGOCIACION': 301, 'COBRANZA JURIDICA': 214, 'SEGUIMIENTO PREVENTIVO': 274 },
+    prioridad: { ALTA: 289, MEDIA: 621, BAJA: 337 },
+    canal: { LLAMADA: 489, WHATSAPP: 503, SMS: 255 }
+  },
+  histograma_probabilidad: [
+    {rango:'0-10%',cantidad:38},{rango:'10-20%',cantidad:72},{rango:'20-30%',cantidad:119},
+    {rango:'30-40%',cantidad:198},{rango:'40-50%',cantidad:247},{rango:'50-60%',cantidad:223},
+    {rango:'60-70%',cantidad:168},{rango:'70-80%',cantidad:104},{rango:'80-90%',cantidad:62},{rango:'90-100%',cantidad:16}
+  ],
+  mora_por_riesgo: { ALTO: 784.2, MEDIO: 481.5, BAJO: 198.3 },
+  top_clientes: [
+    {CEDULA:'1000270337',SALDO:28500000,MORA:420,PROBABILIDAD:0.81,ESTRATEGIA:'ACUERDO DE PAGO',CANAL:'WHATSAPP',NIVEL_RIESGO:'MEDIO',PRIORIDAD:'ALTA'},
+    {CEDULA:'1003449812',SALDO:22100000,MORA:195,PROBABILIDAD:0.76,ESTRATEGIA:'ACUERDO DE PAGO',CANAL:'LLAMADA',NIVEL_RIESGO:'BAJO',PRIORIDAD:'ALTA'},
+    {CEDULA:'1015843200',SALDO:19800000,MORA:380,PROBABILIDAD:0.69,ESTRATEGIA:'NEGOCIACION',CANAL:'LLAMADA',NIVEL_RIESGO:'MEDIO',PRIORIDAD:'ALTA'},
+    {CEDULA:'1020918374',SALDO:17600000,MORA:290,PROBABILIDAD:0.73,ESTRATEGIA:'ACUERDO DE PAGO',CANAL:'WHATSAPP',NIVEL_RIESGO:'BAJO',PRIORIDAD:'ALTA'},
+    {CEDULA:'1045221980',SALDO:15200000,MORA:510,PROBABILIDAD:0.61,ESTRATEGIA:'NEGOCIACION',CANAL:'LLAMADA',NIVEL_RIESGO:'MEDIO',PRIORIDAD:'ALTA'},
+  ],
+  insights: [
+    {tipo:'alerta',titulo:'Alta concentración de riesgo',detalle:'312 clientes (25%) tienen riesgo ALTO. Considerar escalamiento jurídico inmediato.'},
+    {tipo:'oportunidad',titulo:'Gran segmento recuperable',detalle:'458 clientes tienen alta probabilidad de pago. Activar campaña de acuerdo de pago esta semana.'},
+    {tipo:'alerta',titulo:'Mora promedio elevada',detalle:'La mora promedio de 482 días supera el umbral crítico. Priorizar gestión de clientes en 360-720 días.'},
+    {tipo:'oportunidad',titulo:'Cartera con buen potencial',detalle:'La probabilidad promedio de recuperación es 58%. La cartera tiene potencial por encima del umbral recomendado.'},
+    {tipo:'info',titulo:'Canal dominante: WHATSAPP',detalle:'503 clientes (40.3%) se gestionan por WhatsApp. Asegurar capacidad operativa en este canal.'},
+    {tipo:'warning',titulo:'255 clientes sin contacto previo',detalle:'Solo se puede contactar por SMS. Revisar y actualizar bases de datos de contacto para mejorar alcance.'}
+  ]
+};
+
+// =============================================
+// TABS
+// =============================================
+function showTab(name) {
+  ['dashboard','clientes','insights','top'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === name ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach((el, i) => {
+    el.classList.toggle('active', i === ['dashboard','clientes','insights','top'].indexOf(name));
+  });
+}
+
+// =============================================
+// CLOCK
+// =============================================
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('es-CO');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// =============================================
+// LOAD STATS
+// =============================================
+async function loadStats() {
+  document.getElementById('loadingMain').style.display = 'flex';
+  document.getElementById('dashContent').style.display = 'none';
+
+  let data;
+  try {
+    const r = await fetch(API + '/stats');
+    data = await r.json();
+    if (data.error) throw new Error(data.error);
+    document.getElementById('apiStatus').textContent = '🟢 Conectado';
+    document.getElementById('apiStatus').style.color = '#00d88a';
+  } catch(e) {
+    data = MOCK_DATA;
+    document.getElementById('apiStatus').textContent = '🟡 Modo demo';
+    document.getElementById('apiStatus').style.color = '#f5a623';
+  }
+
+  statsData = data;
+  renderDashboard(data);
+  renderInsights(data);
+  renderTopTable(data);
+
+  document.getElementById('loadingMain').style.display = 'none';
+  document.getElementById('dashContent').style.display = '';
+  document.getElementById('lastUpdate').textContent =
+    'Última actualización: ' + new Date().toLocaleString('es-CO');
+}
+
+// =============================================
+// RENDER DASHBOARD
+// =============================================
+function animVal(el, end, fmt) {
+  let t0 = performance.now(), dur = 900;
+  function step(t) {
+    let p = Math.min((t - t0) / dur, 1), ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(Math.round(end * ease));
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function renderDashboard(d) {
+  const k = d.kpis;
+  animVal(document.getElementById('kpi-total'), k.total_clientes, v => v.toLocaleString('es-CO'));
+  document.getElementById('kpi-prob').textContent = Math.round(k.prob_promedio * 100) + '%';
+  animVal(document.getElementById('kpi-alto'), k.clientes_riesgo_alto, v => v.toLocaleString('es-CO'));
+  animVal(document.getElementById('kpi-prio'), k.clientes_prioridad_alta, v => v.toLocaleString('es-CO'));
+  document.getElementById('kpi-saldo').textContent = '$' + (k.saldo_total / 1e9).toFixed(1) + 'B';
+  document.getElementById('kpi-mora').textContent = Math.round(k.mora_promedio) + ' días';
+  animVal(document.getElementById('kpi-gest'), k.gestiones_efectivas, v => v.toLocaleString('es-CO'));
+  document.getElementById('kpi-score').textContent = k.score_promedio.toFixed(1);
+
+  destroyChart('chartHist');
+  destroyChart('chartEstrategia');
+  destroyChart('chartRiesgo');
+  destroyChart('chartCanal');
+  destroyChart('chartMora');
+
+  // Histograma
+  const hist = d.histograma_probabilidad;
+  charts['chartHist'] = new Chart(document.getElementById('chartHist'), {
+    type: 'bar',
+    data: {
+      labels: hist.map(h => h.rango),
+      datasets: [{ label: 'Clientes', data: hist.map(h => h.cantidad),
+        backgroundColor: hist.map((_, i) => i >= 6 ? '#00d88a' : i >= 4 ? '#4d9fff' : '#3a3f4a'),
+        borderWidth: 0, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#7a8090', font: { size: 10 }, autoSkip: false, maxRotation: 35 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#7a8090', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+
+  // Estrategia doughnut
+  const estKeys = Object.keys(d.distribuciones.estrategia);
+  const estVals = Object.values(d.distribuciones.estrategia);
+  const estColors = ['#00d88a','#4d9fff','#ff5252','#f5a623'];
+  buildLegend('legEstrategia', estKeys, estColors, estVals);
+  charts['chartEstrategia'] = new Chart(document.getElementById('chartEstrategia'), {
+    type: 'doughnut',
+    data: { labels: estKeys, datasets: [{ data: estVals, backgroundColor: estColors, borderWidth: 0, hoverOffset: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false } } }
+  });
+
+  // Riesgo doughnut
+  const riesgoCols = { ALTO: '#ff5252', MEDIO: '#f5a623', BAJO: '#00d88a' };
+  const rKeys = Object.keys(d.distribuciones.riesgo);
+  const rVals = Object.values(d.distribuciones.riesgo);
+  const rColors = rKeys.map(k => riesgoCols[k] || '#4d9fff');
+  buildLegend('legRiesgo', rKeys, rColors, rVals);
+  charts['chartRiesgo'] = new Chart(document.getElementById('chartRiesgo'), {
+    type: 'doughnut',
+    data: { labels: rKeys, datasets: [{ data: rVals, backgroundColor: rColors, borderWidth: 0, hoverOffset: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false } } }
+  });
+
+  // Canal bar horizontal
+  const canalCols = { LLAMADA: '#4d9fff', WHATSAPP: '#00d88a', SMS: '#7a8090' };
+  const cKeys = Object.keys(d.distribuciones.canal);
+  const cVals = Object.values(d.distribuciones.canal);
+  const cColors = cKeys.map(k => canalCols[k] || '#a78bfa');
+  buildLegend('legCanal', cKeys, cColors, cVals);
+  charts['chartCanal'] = new Chart(document.getElementById('chartCanal'), {
+    type: 'bar',
+    data: { labels: cKeys, datasets: [{ data: cVals, backgroundColor: cColors, borderWidth: 0, borderRadius: 4 }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#7a8090', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#e8eaf0', font: { size: 12 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Mora por riesgo (insights tab)
+  const mpr = d.mora_por_riesgo;
+  const mKeys = Object.keys(mpr);
+  const mVals = Object.values(mpr);
+  const mColors2 = mKeys.map(k => riesgoCols[k] || '#4d9fff');
+  document.getElementById('moraCard').style.display = '';
+  charts['chartMora'] = new Chart(document.getElementById('chartMora'), {
+    type: 'bar',
+    data: { labels: mKeys, datasets: [{ label: 'Días', data: mVals.map(v => Math.round(v)), backgroundColor: mColors2, borderWidth: 0, borderRadius: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#e8eaf0', font: { size: 13 } }, grid: { display: false } },
+        y: { ticks: { color: '#7a8090', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function buildLegend(containerId, keys, colors, vals) {
+  const total = vals.reduce((a, b) => a + b, 0);
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = keys.map((k, i) =>
+    `<span class="legend-item"><span class="legend-dot" style="background:${colors[i]}"></span>${k} (${Math.round(vals[i]/total*100)}%)</span>`
+  ).join('');
+}
+
+// =============================================
+// RENDER INSIGHTS
+// =============================================
+function renderInsights(d) {
+  const icons = { alerta: '⚠️', oportunidad: '✅', info: 'ℹ️', warning: '🔔' };
+  const cont = document.getElementById('insightsGrid');
+  cont.innerHTML = d.insights.map(ins =>
+    `<div class="insight-card ${ins.tipo}">
+      <div class="insight-icon">${icons[ins.tipo] || 'ℹ️'}</div>
+      <div>
+        <div class="insight-title">${ins.titulo}</div>
+        <div class="insight-text">${ins.detalle}</div>
+      </div>
+    </div>`
+  ).join('');
+}
+
+// =============================================
+// RENDER TOP TABLE
+// =============================================
+function renderTopTable(d) {
+  const rBadge = { ALTO: 'badge-red', MEDIO: 'badge-amber', BAJO: 'badge-green' };
+  const pBadge = { ALTA: 'badge-red', MEDIA: 'badge-amber', BAJA: 'badge-green' };
+  const tbody = document.getElementById('topBody');
+  if (!d.top_clientes || !d.top_clientes.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px">Sin datos</td></tr>';
+    return;
+  }
+  tbody.innerHTML = d.top_clientes.map(c =>
+    `<tr>
+      <td style="font-family:var(--mono);color:var(--blue)">${c.CEDULA}</td>
+      <td style="font-family:var(--mono)">$${Number(c.SALDO).toLocaleString('es-CO')}</td>
+      <td>${c.MORA}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="prob-bar-track" style="width:60px"><div class="prob-bar-fill" style="width:${Math.round(c.PROBABILIDAD*100)}%;background:${c.PROBABILIDAD>=0.7?'#00d88a':c.PROBABILIDAD>=0.45?'#f5a623':'#ff5252'}"></div></div>
+          <span style="font-family:var(--mono);font-size:12px">${Math.round(c.PROBABILIDAD*100)}%</span>
+        </div>
+      </td>
+      <td>${c.ESTRATEGIA}</td>
+      <td>${c.CANAL}</td>
+      <td><span class="badge ${rBadge[c.NIVEL_RIESGO]||'badge-blue'}">${c.NIVEL_RIESGO}</span></td>
+      <td><span class="badge ${pBadge[c.PRIORIDAD]||'badge-blue'}">${c.PRIORIDAD}</span></td>
+    </tr>`
+  ).join('');
+}
+
+// =============================================
+// CONSULTA CLIENTE
+// =============================================
+async function consultarCliente() {
+  const cedula = document.getElementById('cedulaInput').value.trim();
+  if (!cedula) return;
+  document.getElementById('resultPanel').style.display = 'none';
+  document.getElementById('clientError').style.display = 'none';
+  document.getElementById('clientLoading').style.display = 'flex';
+
+  let data;
+  try {
+    const r = await fetch(API + '/analizar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cedula })
+    });
+    data = await r.json();
+    if (data.error) throw new Error(data.error);
+  } catch(e) {
+    // demo fallback
+    data = {
+      cedula, probabilidad: 0.71, nivel_riesgo: 'MEDIO',
+      prioridad_gestion: 'ALTA', canal_recomendado: 'WHATSAPP',
+      estrategia: 'ACUERDO DE PAGO', mora: 420, saldo: 3500000,
+      score_externo: 6, pagos: 3, contactos: 2, gestiones_efectivas: 5, compromisos: 1
+    };
+  }
+  document.getElementById('clientLoading').style.display = 'none';
+  renderClientResult(data);
+}
+
+function renderClientResult(d) {
+  document.getElementById('res-cedula').textContent = 'Cédula: ' + d.cedula;
+  const pct = Math.round(d.probabilidad * 100);
+  document.getElementById('res-prob').textContent = pct + '%';
+  const bar = document.getElementById('probBar');
+  bar.style.width = pct + '%';
+  bar.style.background = pct >= 70 ? '#00d88a' : pct >= 45 ? '#f5a623' : '#ff5252';
+  const badge = document.getElementById('res-riesgo-badge');
+  badge.textContent = d.nivel_riesgo;
+  badge.className = 'badge ' + (d.nivel_riesgo === 'ALTO' ? 'badge-red' : d.nivel_riesgo === 'MEDIO' ? 'badge-amber' : 'badge-green');
+
+  const campos = [
+    ['Estrategia', d.estrategia],
+    ['Prioridad', d.prioridad_gestion],
+    ['Canal', d.canal_recomendado],
+    ['Mora (días)', d.mora],
+    ['Saldo', '$' + Number(d.saldo).toLocaleString('es-CO')],
+    ['Score externo', d.score_externo],
+    ['Pagos', d.pagos],
+    ['Contactos', d.contactos],
+    ['Gestiones', d.gestiones_efectivas],
+  ];
+  document.getElementById('resGrid').innerHTML = campos.map(([l, v]) =>
+    `<div class="result-item">
+      <div class="result-item-label">${l}</div>
+      <div class="result-item-val">${v}</div>
+    </div>`
+  ).join('');
+  document.getElementById('resultPanel').style.display = '';
+}
+
+// Enter key en input
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('cedulaInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') consultarCliente();
+  });
+  loadStats();
+});
+</script>
+</body>
+</html>

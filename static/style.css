@@ -78,6 +78,7 @@ body::before {
     transition: var(--transition);
 }
 
+/* Welcome — centered landing */
 .app.welcome-mode {
     justify-content: center;
     align-items: center;
@@ -101,6 +102,7 @@ body::before {
     animation: slideUp 0.5s ease 0.1s both;
 }
 
+/* Chat — active conversation */
 .app.chat-mode {
     padding-top: 24px;
     padding-bottom: 120px;
@@ -343,7 +345,7 @@ body::before {
 }
 
 .metric-card:nth-child(1) { animation-delay: 0.05s; }
-.metric-card:nth-child(2) { animation-delay: 0.10s; }
+.metric-card:nth-child(2) { animation-delay: 0.1s; }
 .metric-card:nth-child(3) { animation-delay: 0.15s; }
 
 .metric-card:hover {

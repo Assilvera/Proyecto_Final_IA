@@ -197,6 +197,14 @@
     // ==========================================
     // CHAT
     // ==========================================
+    const app = document.getElementById("app");
+    const header = document.getElementById("header");
+    const messagesEl = document.getElementById("messages");
+    const form = document.getElementById("queryForm");
+    const input = document.getElementById("cedulaInput");
+    const submitBtn = document.getElementById("submitBtn");
+
+    let isAnalyzing = false;
 
     function activateChatMode() {
         if (!app.classList.contains("chat-mode")) {
@@ -216,7 +224,10 @@
         const title    = header.querySelector(".title");
         const subtitle = header.querySelector(".subtitle");
         const dbBtn    = header.querySelector(".dashboard-btn");
+        const inner = document.createElement("div");
+        inner.className = "header-inner";
 
+      
         const textBlock = document.createElement("div");
         textBlock.appendChild(title);
         textBlock.appendChild(subtitle);
@@ -363,12 +374,16 @@
 
     function buildFallbackAnalysis(data, probPct) {
         return [
-            `Probabilidad de recuperación: ${probPct}%`,
-            `Nivel de riesgo: ${data.nivel_riesgo}`,
-            `Prioridad: ${data.prioridad_gestion || data.prioridad}`,
-            `Canal recomendado: ${data.canal_recomendado}`,
-            `Estrategia sugerida: ${data.estrategia}`
-        ].join(" | ");
+            "Cliente analizado exitosamente.",
+            "",
+            `• Probabilidad de recuperación: ${probPct}%`,
+            `• Nivel de riesgo: ${data.nivel_riesgo}`,
+            `• Prioridad: ${data.prioridad_gestion || data.prioridad}`,
+            `• Canal recomendado: ${data.canal_recomendado}`,
+            `• Estrategia sugerida: ${data.estrategia}`,
+            "",
+            "La estrategia fue calculada con base en las variables históricas del cliente y el modelo predictivo entrenado."
+        ].join("\n");
     }
 
     function escapeHtml(str) {
@@ -396,6 +411,20 @@
                 method:  "POST",
                 headers: { "Content-Type": "application/json" },
                 body:    JSON.stringify({ mensaje: texto.trim() })
+    async function analyzeClient(cedula) {
+        activateChatMode();
+
+        messagesEl.appendChild(createUserMessage(cedula));
+        messagesEl.appendChild(createLoaderMessage());
+        scrollToBottom();
+
+        setLoading(true);
+
+        try {
+            const response = await fetch("/analizar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ cedula: cedula.trim() })
             });
 
             const data = await response.json();
