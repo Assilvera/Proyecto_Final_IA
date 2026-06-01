@@ -1,4 +1,4 @@
-from flask import Flask, request, Response
+from flask import Flask, request, jsonify, Response, render_template
 import pandas as pd
 import joblib
 import requests
@@ -128,7 +128,7 @@ def canal(contactos):
 # CONFIGURACION OLLAMA
 # ==========================================
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
+OLLAMA_URL   = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "mistral"
 
 # ==========================================
@@ -137,9 +137,9 @@ OLLAMA_MODEL = "mistral"
 
 def llamar_ollama(mensajes):
     payload = {
-        "model": OLLAMA_MODEL,
+        "model":    OLLAMA_MODEL,
         "messages": mensajes,
-        "stream": False
+        "stream":   False
     }
     resp = requests.post(OLLAMA_URL, json=payload, timeout=60)
     resp.raise_for_status()
@@ -214,6 +214,14 @@ def generar_respuesta_ejecutiva(datos_cliente, pregunta_usuario):
     respuesta = llamar_ollama(mensajes)
     return limpiar_texto(respuesta)
 
+
+# ==========================================
+# ENDPOINT PRINCIPAL
+# ==========================================
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 # ==========================================
 # ENDPOINT ANALIZAR (original)
 # ==========================================
@@ -223,7 +231,7 @@ def analizar():
 
     try:
 
-        data = request.json
+        data   = request.json
         cedula = str(data["cedula"])
 
         cliente = df[df["CEDULA"].astype(str) == cedula]
@@ -288,7 +296,7 @@ def chat():
 
     try:
 
-        data = request.json
+        data            = request.json
         mensaje_usuario = str(data.get("mensaje", "")).strip()
 
         if not mensaje_usuario:
@@ -396,6 +404,91 @@ def chat():
             "datos":     datos_cliente,
             "respuesta": respuesta_ia
         })
+
+    except Exception as e:
+        return responder({"error": str(e)})
+
+# ==========================================
+# ENDPOINT DASHBOARD
+# ==========================================
+
+@app.route('/dashboard-data', methods=['GET'])
+def dashboard_data():
+
+    try:
+
+        df_dash = pd.read_csv(
+            "dataset_limpio.csv",
+            dtype={"CEDULA": str},
+            low_memory=False
+        ).fillna(0)
+
+        df_encoded = df_dash.copy()
+
+        for col in columnas_texto:
+            le = label_encoders[col]
+            df_encoded[col] = df_encoded[col].astype(str).apply(
+                lambda x: le.transform([x])[0] if x in le.classes_ else 0
+            )
+
+        X              = df_encoded[features]
+        probabilidades = modelo.predict_proba(X)[:, 1]
+        df_dash['PROBABILIDAD'] = probabilidades
+
+        df_dash['NIVEL_RIESGO'] = df_dash.apply(
+            lambda r: calcular_riesgo(r['PROBABILIDAD'], r['MORA'], r['SCORE_EXTERNO']), axis=1
+        )
+        df_dash['ESTRATEGIA'] = df_dash.apply(
+            lambda r: estrategia(r['PROBABILIDAD'], r['MORA']), axis=1
+        )
+        df_dash['PRIORIDAD'] = df_dash.apply(
+            lambda r: prioridad(r['PROBABILIDAD'], r['SALDO']), axis=1
+        )
+        df_dash['CANAL'] = df_dash['CONTACTOS'].apply(canal)
+
+        # KPIs
+        total_clientes = len(df_dash)
+        saldo_total    = float(df_dash['SALDO'].sum())
+        prob_promedio  = float(df_dash['PROBABILIDAD'].mean())
+        mora_promedio  = float(df_dash['MORA'].mean())
+
+        # Distribuciones
+        por_riesgo     = df_dash['NIVEL_RIESGO'].value_counts().to_dict()
+        por_estrategia = df_dash['ESTRATEGIA'].value_counts().to_dict()
+        por_prioridad  = df_dash['PRIORIDAD'].value_counts().to_dict()
+        por_canal      = df_dash['CANAL'].value_counts().to_dict()
+
+        # Saldo por riesgo
+        saldo_por_riesgo = df_dash.groupby('NIVEL_RIESGO')['SALDO'].sum().to_dict()
+        saldo_por_riesgo = {k: float(v) for k, v in saldo_por_riesgo.items()}
+
+        # Top 10 clientes por saldo
+        top_clientes = (
+            df_dash[['CEDULA', 'SALDO', 'MORA', 'PROBABILIDAD', 'NIVEL_RIESGO', 'ESTRATEGIA']]
+            .sort_values('SALDO', ascending=False)
+            .head(10)
+        )
+        top_clientes = top_clientes.copy()
+        top_clientes['PROBABILIDAD'] = top_clientes['PROBABILIDAD'].round(2)
+        top_clientes['SALDO']        = top_clientes['SALDO'].round(0)
+        top_lista = top_clientes.to_dict(orient='records')
+
+        resultado = {
+            "kpis": {
+                "total_clientes": total_clientes,
+                "saldo_total":    saldo_total,
+                "prob_promedio":  round(prob_promedio * 100, 1),
+                "mora_promedio":  round(mora_promedio, 0)
+            },
+            "por_riesgo":        por_riesgo,
+            "por_estrategia":    por_estrategia,
+            "por_prioridad":     por_prioridad,
+            "por_canal":         por_canal,
+            "saldo_por_riesgo":  saldo_por_riesgo,
+            "top_clientes":      top_lista
+        }
+
+        return responder(resultado)
 
     except Exception as e:
         return responder({"error": str(e)})

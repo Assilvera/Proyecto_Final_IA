@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recovery AI Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app welcome-mode" id="app">
+        <header class="header" id="header">
+            <div class="logo" aria-hidden="true">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="48" height="48" rx="14" fill="url(#logoGrad)"/>
+                    <path d="M24 10C17.37 10 12 15.37 12 22c0 4.2 2.1 7.9 5.3 10.1L15 38h18l-2.3-5.9C33.9 29.9 36 26.2 36 22c0-6.63-5.37-12-12-12z" fill="white" fill-opacity="0.95"/>
+                    <circle cx="19" cy="21" r="2" fill="#0a1628"/>
+                    <circle cx="29" cy="21" r="2" fill="#0a1628"/>
+                    <path d="M19 27c1.5 2 4.5 2 6 0" stroke="#0a1628" stroke-width="1.5" stroke-linecap="round"/>
+                    <defs>
+                        <linearGradient id="logoGrad" x1="0" y1="0" x2="48" y2="48">
+                            <stop stop-color="#2563eb"/>
+                            <stop offset="1" stop-color="#1d4ed8"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <h1 class="title">Recovery AI Assistant</h1>
+            <p class="subtitle">Asistente Inteligente de Recuperación de Cartera</p>
+            <button class="dashboard-btn" id="dashboardBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/>
+                    <rect x="14" y="14" width="7" height="7" rx="1"/>
+                </svg>
+                Dashboard
+            </button>
+        </header>
+
+        <main class="chat-container" id="chatContainer">
+            <div class="messages" id="messages" role="log" aria-live="polite"></div>
+        </main>
+
+        <!-- DASHBOARD -->
+        <section class="dashboard-view" id="dashboardView" style="display:none">
+            <div class="dashboard-header">
+                <h2 class="dashboard-title">Dashboard de Cartera</h2>
+                <button class="close-dashboard-btn" id="closeDashboardBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                    Cerrar
+                </button>
+            </div>
+
+            <div class="dash-loader" id="dashLoader">
+                <div class="loader-spinner"></div>
+                <span>Cargando indicadores...</span>
+            </div>
+
+            <div class="dash-content" id="dashContent" style="display:none">
+
+                <!-- KPIs -->
+                <div class="kpi-grid" id="kpiGrid"></div>
+
+                <!-- Fila de gráficas -->
+                <div class="charts-row">
+                    <div class="chart-card">
+                        <h3 class="chart-title">Clientes por Nivel de Riesgo</h3>
+                        <div class="donut-wrap">
+                            <canvas id="chartRiesgo"></canvas>
+                            <div class="donut-legend" id="legendRiesgo"></div>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3 class="chart-title">Estrategias Recomendadas</h3>
+                        <div class="donut-wrap">
+                            <canvas id="chartEstrategia"></canvas>
+                            <div class="donut-legend" id="legendEstrategia"></div>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3 class="chart-title">Canal Recomendado</h3>
+                        <div class="donut-wrap">
+                            <canvas id="chartCanal"></canvas>
+                            <div class="donut-legend" id="legendCanal"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Saldo por riesgo -->
+                <div class="chart-card chart-card--wide">
+                    <h3 class="chart-title">Saldo en Mora por Nivel de Riesgo</h3>
+                    <canvas id="chartSaldo" height="80"></canvas>
+                </div>
+
+                <!-- Top clientes -->
+                <div class="chart-card chart-card--wide">
+                    <h3 class="chart-title">Top 10 Clientes por Saldo</h3>
+                    <div class="table-wrap">
+                        <table class="dash-table" id="topTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Cédula</th>
+                                    <th>Saldo</th>
+                                    <th>Mora (días)</th>
+                                    <th>Probabilidad</th>
+                                    <th>Riesgo</th>
+                                    <th>Estrategia</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <footer class="input-area" id="inputArea">
+            <form class="query-bar" id="queryForm" autocomplete="off">
+                <input
+                    type="text"
+                    id="cedulaInput"
+                    name="mensaje"
+                    placeholder="Escribe tu consulta o cédula de cliente..."
+                    required
+                    aria-label="Consulta"
+                >
+                <button type="submit" id="submitBtn">
+                    <span class="btn-text">Consultar</span>
+                    <span class="btn-spinner" aria-hidden="true"></span>
+                </button>
+            </form>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
