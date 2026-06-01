@@ -2,6 +2,7 @@
 from flask import Flask, request, jsonify, Response, render_template, send_from_directory
 
 import pandas as pd
+import numpy as np
 import joblib
 import requests
 import json
@@ -428,18 +429,8 @@ def chat():
             "respuesta": respuesta_ia
         })
 
-            "respuesta_ia":
-            generar_respuesta_ia(
-                probabilidad,
-                cliente,
-                riesgo,
-                prioridad_ia,
-                canal_ia,
-                estrategia_ia
-            ),
-
-            "mora":
-            int(cliente["MORA"]),
+    except Exception as e:
+        return responder({"error": str(e)})
 
 # ==========================================
 # ENDPOINT DASHBOARD

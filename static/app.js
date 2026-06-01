@@ -197,14 +197,6 @@
     // ==========================================
     // CHAT
     // ==========================================
-    const app = document.getElementById("app");
-    const header = document.getElementById("header");
-    const messagesEl = document.getElementById("messages");
-    const form = document.getElementById("queryForm");
-    const input = document.getElementById("cedulaInput");
-    const submitBtn = document.getElementById("submitBtn");
-
-    let isAnalyzing = false;
 
     function activateChatMode() {
         if (!app.classList.contains("chat-mode")) {
@@ -224,8 +216,6 @@
         const title    = header.querySelector(".title");
         const subtitle = header.querySelector(".subtitle");
         const dbBtn    = header.querySelector(".dashboard-btn");
-        const inner = document.createElement("div");
-        inner.className = "header-inner";
 
       
         const textBlock = document.createElement("div");
@@ -408,23 +398,9 @@
 
         try {
             const response = await fetch("/chat", {
-                method:  "POST",
-                headers: { "Content-Type": "application/json" },
-                body:    JSON.stringify({ mensaje: texto.trim() })
-    async function analyzeClient(cedula) {
-        activateChatMode();
-
-        messagesEl.appendChild(createUserMessage(cedula));
-        messagesEl.appendChild(createLoaderMessage());
-        scrollToBottom();
-
-        setLoading(true);
-
-        try {
-            const response = await fetch("/analizar", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ cedula: cedula.trim() })
+                body: JSON.stringify({ mensaje: texto.trim() })
             });
 
             const data = await response.json();
@@ -438,9 +414,8 @@
                     : data
                 ));
             } else {
-                messagesEl.appendChild(createGeneralMessage(data.respuesta));
+                messagesEl.appendChild(createGeneralMessage(data.respuesta || "Sin respuesta del asistente."));
             }
-
         } catch (err) {
             removeLoader();
             messagesEl.appendChild(
